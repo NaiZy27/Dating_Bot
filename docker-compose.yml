@@ -1,0 +1,39 @@
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Внутри compose базы доступны по имени сервиса, а не по localhost
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dating}:${POSTGRES_PASSWORD:-dating}@postgres:5432/${POSTGRES_DB:-dating_db}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dating}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dating}
+      POSTGRES_DB: ${POSTGRES_DB:-dating_db}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
+volumes:
+  pg_data:
+  redis_data:
